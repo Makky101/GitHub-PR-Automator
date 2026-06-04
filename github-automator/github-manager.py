@@ -1,8 +1,9 @@
 import os
 from typing import Literal
+import sys
 
 import httpx
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP,Context
 
 mcp = FastMCP("github-manager", json_response=True)
 
@@ -11,7 +12,7 @@ ENV_FILE = os.path.join(os.path.dirname(__file__), ".env")
 if os.path.exists(ENV_FILE):
     from dotenv import load_dotenv
 
-    load_dotenv(dotenv_path=ENV_FILE, override=False)
+    load_dotenv(dotenv_path=ENV_FILE)
 
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 GITHUB_URL = "https://api.github.com"
@@ -27,10 +28,11 @@ def get_client(extra_headers: dict | None = None):
     if not GITHUB_TOKEN:
         raise ValueError("Missing GITHUB_TOKEN. Set it in Claude's MCP config or in a local .env file.")
 
+
     headers = HEADERS.copy()
     if extra_headers:
         headers.update(extra_headers)
-
+    
     return httpx.AsyncClient(base_url=GITHUB_URL, headers=headers)
 
 
@@ -39,10 +41,13 @@ def get_client(extra_headers: dict | None = None):
 async def list_issues(
     owner: str,
     repo: str,
+    ctx: Context,
     state: Literal["open", "closed", "all"] = "open",
     max_results: int = 50,
 ) -> str:
     """List repository issues by state. Pull requests are filtered out of the response."""
+
+    ctx.info(f"Claude requested issues for {owner}/{repo} State: {state}")
     if max_results < 1:
         return "Error: max_results must be at least 1."
 
@@ -52,6 +57,7 @@ async def list_issues(
     try:
         async with get_client() as client:
             while len(res) < max_results:
+                ctx.info(f"Fetching page {page} from GitHub API...")
                 response = await client.get(
                     f"/repos/{owner}/{repo}/issues",
                     params={"state": state, "per_page": per_page, "page": page},
@@ -62,7 +68,10 @@ async def list_issues(
                 page_data = response.json()
 
                 if not page_data:
+                    ctx.info("No more pages left on GitHub.")
                     break
+
+                ctx.info(f"Received {len(page_data)} items from GitHub for page {page}.")
 
                 for issue in page_data:
                     if "pull_request" not in issue:
@@ -78,8 +87,11 @@ async def list_issues(
 
                 page += 1
 
+        ctx.info(f"Successfully filtered out PRs. Sending {len(res)} total issues to Claude.")
         return "\n".join(res) if res else "No Issues Found"
+    
     except ValueError as exc:
+        ctx.error(f"Something went wrong inside list_issues: {str(exc)}")
         return f"Error: {exc}"
     except httpx.RequestError as exc:
         return f"An error occurred while requesting {exc.request.url!r}."

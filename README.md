@@ -59,16 +59,10 @@ Do not commit real tokens.
 
 ## Run Locally
 
-Use the MCP Inspector while developing:
+Use the MCP Inspector while developing and Run it as a stdio MCP server:
 
 ```powershell
-uv run mcp dev main.py:mcp
-```
-
-Run it as a stdio MCP server:
-
-```powershell
-uv run mcp run main.py:mcp
+npx -y @modelcontextprotocol/inspector 
 ```
 
 ## Add To Claude Desktop
@@ -76,31 +70,33 @@ uv run mcp run main.py:mcp
 The MCP Python SDK can install FastMCP servers into Claude Desktop:
 
 ```powershell
-uv run mcp install main.py:mcp --name "GitHub Manager" -v GITHUB_TOKEN=github_pat_your_token_here
+uv run mcp install github-manager.py --name "GitHub Manager" -v GITHUB_TOKEN=github_pat_your_token_here
 ```
 
 If you already have a `.env` file:
 
 ```powershell
-uv run mcp install main.py:mcp --name "GitHub Manager" -f .env
+uv run mcp install github-manager.py --name "GitHub Manager" -f .env
 ```
 
 Restart Claude Desktop after installing the server.
 
 You can also add it manually to `claude_desktop_config.json`:
 
+Use absolute paths for manual configuration. This avoids Claude Desktop starting from a different working directory and failing to find `uv.exe` or `github-manager.py`.
+
 ```json
 {
   "mcpServers": {
     "github-manager": {
-      "command": "uv",
+      "command": "C:\\Users\\DELL\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\uv.exe",
       "args": [
-        "--directory",
-        "C:\\Users\\DELL\\OneDrive\\Documents\\PBL\\GitHub & PR Automator\\github-automator",
         "run",
+        "--with",
+        "mcp[cli]",
         "mcp",
         "run",
-        "main.py:mcp"
+        "C:\\Users\\DELL\\OneDrive\\Documents\\PBL\\GitHub & PR Automator\\github-automator\\github-manager.py"
       ],
       "env": {
         "GITHUB_TOKEN": "github_pat_your_token_here"
@@ -109,6 +105,8 @@ You can also add it manually to `claude_desktop_config.json`:
   }
 }
 ```
+
+Replace the `command` value with the absolute path to your own `uv.exe`, and replace the final argument with the absolute path to your own `github-manager.py`.
 
 On Windows, Claude Desktop normally reads this file from:
 
@@ -121,7 +119,7 @@ On Windows, Claude Desktop normally reads this file from:
 From the `github-automator` folder:
 
 ```powershell
-claude mcp add --transport stdio --env GITHUB_TOKEN=github_pat_your_token_here github-manager -- uv run mcp run main.py:mcp
+claude mcp add --transport stdio --env GITHUB_TOKEN=github_pat_your_token_here github-manager -- uv run mcp run github-manager.py:mcp
 ```
 
 Then check the connection inside Claude Code:
